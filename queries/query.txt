@@ -1,0 +1,28 @@
+CREATE table tmp.log (
+    id Int,
+    timestamp DateTime,
+    operation String,
+    ds String,
+    info String
+) 
+order by id
+
+insert into tmp.log
+SELECT 
+    max(id) + 1 as id,
+    now() as timestamp,
+    'success' as operation,
+    'ds' as ds,
+    'info' as info
+from tmp.log
+ORDER BY id
+limit 1
+
+select * from tmp.log
+
+-- TRUNCATE table tmp.log
+
+select * from raw.user_payments
+
+drop table tmp.log
+

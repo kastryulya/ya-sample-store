@@ -1,0 +1,21 @@
+create DATABASE staging
+
+CREATE Table staging.users (
+    id Int64,
+    name String,
+    age Int8,
+    event_date DATE
+) engine = MergeTree()
+partition by event_date
+order by id
+ 
+insert into staging.users (id, name, age, event_date) VALUES
+    (1, 'Alice', 20, '2026-01-01'),
+    (2, 'Bob', 57, '2026-01-01')
+
+select * from staging.users
+
+drop table staging.users
+
+drop DATABASE staging
+

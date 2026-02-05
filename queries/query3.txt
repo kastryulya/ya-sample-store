@@ -1,0 +1,104 @@
+create DATABASE dwh
+
+CREATE VIEW if not EXISTS dwh.user_visits AS
+select 
+    toDate(date) as date,
+    action_type,
+    placement_type,
+    user_visit_url,
+    count(*) as cnt_actions,
+    count(distinct user_client_id) as cnt_unique_user
+from raw.site_visits
+group by 
+    date, 
+    action_type, 
+    placement_type, 
+    user_visit_url
+
+select * from dwh.user_visits
+order by 
+    (date, 
+    action_type, 
+    placement_type, 
+    user_visit_url)
+
+create TABLE dwh.user_visits_new (
+    date Date,
+    action_type LowCardinality(String),
+    placement_type LowCardinality(String),
+    user_visit_url String,
+    cnt_unique_user UInt32,
+    cnt_actions UInt32
+) engine = SummingMergeTree()
+order by (date, action_type, placement_type, user_visit_url)
+
+create MATERIALIZED VIEW if NOT EXISTS dwh.user_visits_new_mv to dwh.user_visits_new as (
+SELECT
+    toDate(date) as date,
+    action_type,
+    placement_type,
+    user_visit_url,
+    count(DISTINCT user_visit_url) as cnt_unique_user,
+    count(user_visit_url) as cnt_actions
+from raw.site_visits
+group by date, action_type, placement_type, user_visit_url
+)
+
+insert INTO dwh.user_visits_new
+SELECT
+    toDate(date) as date,
+    action_type,
+    placement_type,
+    user_visit_url,
+    count(DISTINCT user_visit_url) as cnt_unique_user,
+    count(user_visit_url) as cnt_actions
+from raw.site_visits
+group by date, action_type, placement_type, user_visit_url
+
+select * from dwh.user_visits_new
+order by 
+    (date, 
+    action_type, 
+    placement_type, 
+    user_visit_url)
+
+create TABLE dwh.item_payments (
+    date Date,
+    item LowCardinality(String),
+    status LowCardinality(String),
+    total_amount Float32,
+    total_quantity UInt32, 
+    total_discount Float32,
+    cnt_uniq_users UInt32,
+    cnt_statuses UInt32
+) engine = SummingMergeTree()
+order by (date, item, status)
+
+create MATERIALIZED VIEW if not EXISTS dwh.item_payments_mv to dwh.item_payments as (
+SELECT
+    toDate(date) as date,
+    item,
+    status,
+    sum(amount) as total_amount,
+    sum(quantity) as total_quantity,
+    sum(price*quantity) - sum(amount) AS total_discount,
+    count(DISTINCT user_client_id) as cnt_uniq_users,
+    count(user_client_id) AS cnt_statuses
+from raw.user_payments
+GROUP BY date, item, status
+)
+
+insert into dwh.item_payments
+SELECT
+    toDate(date) as date,
+    item,
+    status,
+    sum(amount) as total_amount,
+    sum(quantity) as total_quantity,
+    sum(price*quantity) - sum(amount) AS total_discount,
+    count(DISTINCT user_client_id) as cnt_uniq_users,
+    count(user_client_id) AS cnt_statuses
+from raw.user_payments
+GROUP BY date, item, status
+
+select * from dwh.item_payments_mv

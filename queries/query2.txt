@@ -1,0 +1,90 @@
+CREATE DATABASE tmp
+
+CREATE TABLE tmp.site_visits(
+    date String,
+    timestamp String,
+    user_client_id Int64,
+    action_type String,
+    placement_type String,
+    placement_id Int64,
+    user_visit_url String
+) 
+engine = Log
+
+create table tmp.user_payments(
+    date String,
+    timestamp String,
+    user_client_id Int64,
+    item String,
+    price Int64,
+    quantity Int64,
+    amount Float64,
+    discount Float64,
+    order_id Int64,
+    status String
+)
+engine = Log
+
+create DATABASE raw
+
+create table raw.site_visits (
+    date DateTime,
+    timestamp DateTime,
+    user_client_id Int64,
+    action_type String,
+    placement_type String,
+    placement_id Int64,
+    user_visit_url String,
+    insert_time DateTime,
+    hash String
+)
+engine = MergeTree()
+partition by toYYYYMM(date)
+order by date
+
+create table raw.user_payments(
+    date DateTime,
+    timestamp DateTime,
+    user_client_id String,
+    item String,
+    price Int64,
+    quantity Int64,
+    amount Float64,
+    discount Float64,
+    order_id Int64,
+    status String,
+    insert_time DateTime,
+    hash String
+)
+engine = MergeTree()
+partition by toYYYYMM(date)
+order by date
+
+insert into raw.site_visits
+SELECT  
+    toDateTime(date) as date,
+    toDateTime(timestamp) as timestamp,
+    user_client_id,
+    action_type,
+    placement_type,
+    placement_id,
+    user_visit_url,
+    now() as insert_time,
+    cityHash64(*) as hash
+from tmp.site_visits
+
+insert into raw.user_payments
+SELECT
+    toDateTime(date) as date,
+    toDateTime(timestamp) as timestamp,
+    user_client_id,
+    item,
+    price,
+    quantity,
+    amount,
+    discount,
+    order_id,
+    status,
+    now() as insert_time,
+    cityHash64(*) as hash  
+from tmp.user_payments
